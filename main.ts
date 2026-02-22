@@ -5,6 +5,46 @@
 //##                    ##//
 //########################//
 ////////////////////////////
+////////////////
+//  INCLUDE   //
+//  radio.ts  //
+////////////////
+
+/*
+Use ETsend for sending messages between ETmbit modules.
+The messages are parsed in the ETmbit/general module.
+*/
+
+function ETsend(id: string, msg: string) {
+    // messages end with a '~'
+    // messages are sent in chunks
+    // mbit radio buffer size is only 19 bytes
+    //
+    // chunk format:
+    // -------------
+    // char 0..1 :   id
+    // char 2..18 :  msg chunk 
+
+    switch (id.length) {
+        case 0: id = "ET"; break
+        case 1: id += "#"; break
+        case 2: break
+        default: id = id.substr(0, 2)
+    }
+    let chunk: string
+    do {
+        chunk = msg.substr(0, 17)
+        msg = msg.substr(17)
+        if (chunk.length < 17)
+            chunk += '~'
+        radio.sendString(id + chunk)
+        basic.pause(1)
+    } while (msg.length > 0)
+}
+
+///////////////////
+//  END INCLUDE  //
+///////////////////
 
 // 0: stop playing
 // 1: start playing
@@ -77,7 +117,7 @@ function receiveMidi(radiocmd: number): MidiMessage {
 
 function sendMidi(command: MidiCommand, value: number = 0) {
     if (command >= 100) command += value
-    radio.sendNumber(command)
+    ETsend("MI", command.toString())
 }
 
 
@@ -493,8 +533,8 @@ MidiController.setVolume(3, 64)
 MidiController.setVolume(4, 64)
 MidiController.setVolume(5, 64)
 
-messageHandler = (cmd: number) => {
-    let msg: MidiMessage = receiveMidi(cmd)
+function messageHandler(cmd: string) {
+    let msg: MidiMessage = receiveMidi(+cmd)
     switch (msg.Command) {
         case MidiCommand.Stop: MidiController.stop(); break;
         case MidiCommand.Start: MidiController.start(); break;
@@ -516,8 +556,9 @@ messageHandler = (cmd: number) => {
         case MidiCommand.Duration: MidiController.setTempo(msg.Value); break;
     }
 }
+General.registerMessageHandler("MI", messageHandler)
 
-displayHandler = () => {
+function displayHandler() {
     if (tm_pause)
         showPaused()
     else
@@ -526,3 +567,4 @@ displayHandler = () => {
         else
             showStopped()
 }
+General.registerDisplayHandler(displayHandler)
